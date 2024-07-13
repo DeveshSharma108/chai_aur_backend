@@ -17,7 +17,7 @@ const registerUser = asyncHandler(async (req,res)=>{
     // return result
 
     const {username,email,fullName,password} = req.body
-    console.log("email :",email)
+    // console.log("email :",email)
 
     // if (fullName === "") {
     //     throw new ApiError(400,"Full Name can't be empty")
@@ -31,16 +31,27 @@ const registerUser = asyncHandler(async (req,res)=>{
 
     // User model can talk to mongoDB
 
-    const existingUser = User.findOne({
+    const existingUser = await User.findOne({
         $or: [{username},{email}]
     })
+
+    // file is being uploaded by multer in-case of existing user also we need to unlink the files in-case of existing user
 
     if (existingUser) {
         throw new ApiError(409,"User already exist !!")
     }
+
+    // console.log(req.files)
     
     const avatarLocalPath = req.files?.avatar[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path; // was giving error when coverImage is not uploaded
+
+    let coverImageLocalPath;
+
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+        coverImageLocalPath = req.files.coverImage[0].path
+    }
+
 
     if (!avatarLocalPath) {
         throw new ApiError(400,"Avatar is require for user profile ")

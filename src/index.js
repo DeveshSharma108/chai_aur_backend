@@ -1,14 +1,14 @@
 // require('dotenv').config({path: './env'})   will work but disturbs code consistency
 
 import dotenv from "dotenv"
-import connecDB from "./db/index.js";
+import connectDB from "./db/index.js";
 import { app } from "./app.js";
 
 dotenv.config(
     {path: './env'}
 )
 
-connecDB().
+connectDB().
 then(()=>{
     try {
         app.listen(process.env.PORT || 8000,()=>{
