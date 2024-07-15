@@ -4,6 +4,23 @@ import { User } from "../models/user.model.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { apiResponse } from "../utils/apiResponse.js"
 
+const generateAccessAndRefreshToken = async function(userId){
+    try {
+        const user = await User.findById(userId)
+
+        const accessToken = user.generateAccessToken()
+        const refreshToken= user.generateRefreshToken()
+
+        user.refreshToken = refreshToken  // just like saving a value to a property to a simple javascript object
+        await user.save({validateBeforeSave: false})   // to save only refreshToken 
+
+        return({accessToken,refreshToken})
+
+    } catch (error) {
+        throw new ApiError(500,"Something went wrong while generating access or refresh token ...")
+    }
+}
+
 const registerUser = asyncHandler(async (req,res)=>{
     // get user details from frontend,postman etc..
     // validate the details 
@@ -86,4 +103,82 @@ const registerUser = asyncHandler(async (req,res)=>{
 
 })
 
-export { registerUser }
+const loginUser = asyncHandler(async (req,res)=>{
+    // get data from req
+    // username or email
+    // find the user
+    // password check
+    // access and refresh token
+    // send secure cookies
+    // send response
+
+    const {email,username,password} = req.body
+    if (!(username || email)) {
+        throw new ApiError(400,"email or username is required for logging in .....")
+    }
+
+    const user = await User.findOne({$or: [{email},{username}]})
+
+    if (!user) {
+        throw new ApiError(404,"User does not exist !!")
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password,this.password)
+
+    if (!isPasswordValid) {
+        throw new ApiError(401,"Wrong password !")
+    }
+
+    const {accessToken,refreshToken} = await generateAccessAndRefreshToken(user._id)
+
+    const loggedUser = await User.findById(user._id).select("-password -refreshToken")
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res.status(200).
+    cookie("accessToken",accessToken,options).
+    cookie("refreshToken",refreshToken,options).
+    json(
+        new apiResponse(
+            200,
+            {
+                user: loggedUser,refreshToken,accessToken
+            },
+            "User logged in successfuly........"
+        )
+    )
+
+
+    
+})
+
+// how to log out a user (while logging out we can't tell the user to enter email or username (why ?))
+// middleware " jane se phle mujse milkar jana :-) "
+
+const logoutUser = asyncHandler(async(req,res)=>{
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {refreshToken: undefined}
+        },
+        {
+            new: true
+        }
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+    .status(200)
+    .clearCookie("accessToken",accessToken,options)
+    .clearCookie("refreshToken",refreshToken,options)
+    .json(new apiResponse(200,{},"User logged out !"))
+})
+
+export { registerUser,loginUser,logoutUser }
